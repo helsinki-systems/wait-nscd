@@ -2,24 +2,7 @@ use std::os::unix::net::UnixStream;
 use std::io::Write;
 use serde::{Serialize, Deserialize};
 use std::{thread, time};
-use clap::Parser;
-
-/// Wait for nscd to return the correct data
-#[derive(Parser)]
-struct Cli {
-    #[clap(short = 's', long, default_value = PATH_NSCDSOCKET)]
-    /// nscd socket to connect to
-    nscd_socket: String,
-    #[clap(short = 'u', long, default_value = "root")]
-    /// Username to look up via nscd
-    username: String,
-    #[clap(short = 'i', long, default_value_t = 0)]
-    /// UID to expect from the lookup
-    expected_uid: u32,
-    #[clap(short = 'm', long, default_value_t = 100)]
-    /// Milliseconds to sleep between tries
-    sleep_millis: u64,
-}
+use easy_flag::FlagSet;
 
 /// Rust representation of struct request_header in nscd/nscd-client.h
 #[repr(C, packed)]
@@ -105,13 +88,39 @@ fn request_user_lookup(nscd_socket: &String, username: &String, expected_uid: u3
     Ok(())
 }
 
-fn main() {
-    let args = Cli::parse();
+fn main() -> Result<(), String> {
+    let mut help = false;
+    let mut nscd_socket = String::from(PATH_NSCDSOCKET);
+    let mut username = String::from("root");
+    let mut expected_uid = 0;
+    let mut sleep_millis = 100;
+    let args: Vec<String> = std::env::args().collect();
+
+    let mut my_set = FlagSet::new(&args[0])
+        .add("-h, --help", &mut help, "Prints this help message")
+        .add("-s, --nscd-socket", &mut nscd_socket, "Path to the nscd socket")
+        .add("-u, --username", &mut username, "Username to look up via nscd")
+        .add("-i, --expected-uid", &mut expected_uid, "UID to expect from the lookup")
+        .add("-m, --sleep-millis", &mut sleep_millis, "Milliseconds to sleep between tries");
+
+    if let Err(err) = my_set.parse(&args[1..]) {
+        println!("{}", my_set.defaults());
+        return Err(err);
+    }
+
+    let usage = my_set.usage();
+    if help {
+        println!("{}: Waits for nscd to be available and to return valid data", args[0]);
+        println!("{}", usage);
+        return Ok(());
+    }
+
+
     loop {
-        match request_user_lookup(&args.nscd_socket, &args.username, args.expected_uid) {
-            Ok(_) => break,
+        match request_user_lookup(&nscd_socket, &username, expected_uid) {
+            Ok(_) => return Ok(()),
             Err(e) => println!("{}", e),
         };
-        thread::sleep(time::Duration::from_millis(args.sleep_millis));
+        thread::sleep(time::Duration::from_millis(sleep_millis));
     }
 }

@@ -1,12 +1,12 @@
 [package]
 name = "wait-nscd"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "3.2", features = ["derive"] }
+easy_flag = "0.1.2"
 bincode = "1.3"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0.62"
